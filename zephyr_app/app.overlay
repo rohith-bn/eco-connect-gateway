@@ -1,0 +1,43 @@
+/*
+ * EcoConnect IoT Gateway - Devicetree Hardware Overlay
+ * Target: STM32F407G-DISC1 (MB997)
+ */
+
+/ {
+	aliases {
+		led0 = &green_led_4;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+		green_led_4: led_4 {
+			gpios = <&gpiod 12 GPIO_ACTIVE_HIGH>;
+			label = "User Green LED LD4";
+		};
+	};
+};
+
+/* I2C1 Bus for Sensor Interface (PB6 SCL, PB7 SDA) */
+&i2c1 {
+	status = "okay";
+	pinctrl-0 = <&i2c1_scl_pb6 &i2c1_sda_pb7>;
+	pinctrl-names = "default";
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+};
+
+/* SPI1 Bus for ENC28J60 Ethernet Controller */
+&spi1 {
+	status = "okay";
+	pinctrl-0 = <&spi1_sck_pa5 &spi1_miso_pa6 &spi1_mosi_pa7>;
+	pinctrl-names = "default";
+	cs-gpios = <&gpiob 12 GPIO_ACTIVE_LOW>;
+
+	enc28j60@0 {
+		compatible = "microchip,enc28j60";
+		reg = <0>;
+		spi-max-frequency = <10500000>; /* 10.5 MHz */
+		int-gpios = <&gpiob 1 GPIO_ACTIVE_LOW>;
+		local-mac-address = [ 00 04 a3 11 22 33 ];
+		status = "okay";
+	};
+};
