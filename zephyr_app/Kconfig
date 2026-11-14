@@ -1,0 +1,21 @@
+menu "EcoConnect Application"
+
+module = APP_MAIN
+module-str = app_main
+source "subsys/logging/Kconfig.template.log_config"
+
+module = BME280_MOD
+module-str = bme280_sensor
+source "subsys/logging/Kconfig.template.log_config"
+
+module = ENC_SPI_MOD
+module-str = enc28j60_spi
+source "subsys/logging/Kconfig.template.log_config"
+
+module = HTTP_SRV_MOD
+module-str = http_srv
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu
+
+source "Kconfig.zephyr"
