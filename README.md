@@ -1,6 +1,6 @@
 # EcoConnect IoT Gateway Firmware
 
-An industrial IoT gateway firmware implementation for the STM32F407 platform, bridging environmental sensor nodes with IP networks via SPI Ethernet, developed as part of the System Design Masterclass.
+An industrial IoT edge gateway firmware implementation for the STM32F407 platform, bridging physical sensor nodes with IP networks via SPI Ethernet, engineered as an advanced systems engineering and edge architecture showcase.
 
 ```text
  ┌──────────────────────────┐
@@ -197,5 +197,5 @@ The embedded gateway responds with live JSON telemetry:
 
 ## 7. License & Authorship
 
-Authored by **Rohith B Narasimhamurthy** as part of the System Design Masterclass.  
+Authored by **Rohith B Narasimhamurthy** as an advanced embedded systems engineering and edge architecture showcase.  
 Licensed under the Apache-2.0 License.
