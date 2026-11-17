@@ -14,7 +14,9 @@
 #include <zephyr/net/dhcpv4.h>
 
 #include "bme280_sensor.h"
+#if !defined(CONFIG_ETH_ENC28J60)
 #include "enc28j60_spi.h"
+#endif
 #include "http_server.h"
 
 LOG_MODULE_REGISTER(app_main, CONFIG_APP_MAIN_LOG_LEVEL);

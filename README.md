@@ -35,9 +35,13 @@ An industrial IoT gateway firmware implementation for the STM32F407 platform, br
 
 ```text
 eco-connect-gateway/
-├── .gitignore
-├── README.md
-├── baremetal/                        # Stage 1: Bare-Metal Silicon Bring-Up
+├── .clangd                          # LLVM Clangd driver flag filtering
+├── .gitignore                       # Clean Git exclusion rules
+├── west.yml                         # Self-bootstrapping West manifest
+├── README.md                        # Master architectural documentation
+├── docs/                            # Deep engineering specifications
+│   └── 01_zephyr_architecture_and_bringup_guide.md
+├── baremetal/                       # Stage 1: Bare-Metal Silicon Bring-Up
 │   ├── Makefile                     # Standalone GCC build script
 │   ├── build.bat                    # Windows convenience build script
 │   ├── flash.bat                    # OpenOCD programming script
@@ -47,10 +51,18 @@ eco-connect-gateway/
 │   └── main.c                       # Register-level GPIO blinky
 └── zephyr_app/                      # Stage 2: Production Zephyr RTOS Application
     ├── CMakeLists.txt               # Zephyr application CMake definition
-    ├── prj.conf                     # Kconfig kernel and driver selection
+    ├── prj.conf                     # Kconfig kernel, network, and driver selection
     ├── app.overlay                  # Devicetree hardware pin mapping
-    └── src/
-        └── main.c                   # Application entry point & device checks
+    ├── Kconfig                      # Application-level Kconfig logging menus
+    ├── include/                     # Public driver contracts
+    │   ├── bme280_sensor.h          # Bosch BME280 I2C API
+    │   ├── enc28j60_spi.h           # Microchip ENC28J60 SPI API
+    │   └── http_server.h            # BSD Sockets HTTP server API
+    └── src/                         # Modular C implementations
+        ├── bme280_sensor.c          # I2C driver & 32-bit polynomial compensation
+        ├── enc28j60_spi.c           # SPI hardware probe & revision reader
+        ├── http_server.c            # Multithreaded TCP HTTP server
+        └── main.c                   # System coordinator & network event listener
 ```
 
 ---
@@ -93,13 +105,32 @@ Alternatively on Windows PowerShell:
 
 ### Target 2: Building & Flashing Zephyr RTOS Application
 
-The Zephyr application provides driver integration, Devicetree hardware decoupling, and TCP/IP network stack support.
+This repository functions as a self-bootstrapping West manifest repository (`west.yml`). Anyone can clone and build the complete stack in two commands:
 
+#### Option A: Quickstart from Scratch (Self-Bootstrapping Manifest)
 ```bash
-# From the repository root
-west build -b stm32f4_disco zephyr_app
+# 1. Initialize a new workspace using this repository's West manifest
+west init -m https://github.com/rohith-bn/eco-connect-gateway.git eco_workspace
+cd eco_workspace
 
-# Flash to target silicon
+# 2. Pull all matching Zephyr dependencies (kernel, STM32 HAL, CMSIS)
+west update
+
+# 3. Build for STM32F4-Discovery
+west build -b stm32f4_disco eco-connect-gateway/zephyr_app
+
+# 4. Flash to silicon via OpenOCD / ST-LINK
+west flash
+```
+
+#### Option B: Building Inside an Existing Zephyr Workspace
+If you already have a Zephyr development workspace:
+```bash
+# Clone directly into your application directory
+git clone https://github.com/rohith-bn/eco-connect-gateway.git
+
+# Build and flash
+west build -b stm32f4_disco eco-connect-gateway/zephyr_app
 west flash
 ```
 

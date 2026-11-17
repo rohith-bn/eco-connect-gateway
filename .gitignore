@@ -17,6 +17,8 @@ cmake_install.cmake
 Makefile.cmake
 *.ninja
 .ninja_*
+.cache/
+**/.cache/
 
 # IDE & Editor Environments
 .vscode/
