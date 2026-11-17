@@ -2,6 +2,26 @@
 
 An industrial IoT gateway firmware implementation for the STM32F407 platform, bridging environmental sensor nodes with IP networks via SPI Ethernet, developed as part of the System Design Masterclass.
 
+```text
+ ┌──────────────────────────┐
+ │   Bosch BME280 Sensor    │
+ │ (Temperature / Pressure) │
+ └─────────────┬────────────┘
+               │ I2C1 (PB6/PB7 @ 400 kHz)
+               ▼
+ ┌────────────────────────────────────────────────────────┐
+ │        STM32F407G-DISC1 (ARM Cortex-M4 @ 168 MHz)      │
+ │  - Zephyr RTOS Multi-Threaded Kernel                   │
+ │  - Native BSD Sockets HTTP Web Server (TCP Port 80)    │
+ └─────────────┬──────────────────────────────────────────┘
+               │ SPI1 (PA5/PA6/PA7 + CS PB12 @ 10.5 MHz)
+               ▼
+ ┌──────────────────────────┐         RJ45 Cat5 Cable
+ │   Microchip ENC28J60     │─────────────────────────► Local LAN / Switch
+ │  Standalone Ethernet MAC │                           (DHCPv4 Assigned)
+ └──────────────────────────┘
+```
+
 ---
 
 ## 1. Hardware Architecture & Board Profile
@@ -11,7 +31,7 @@ An industrial IoT gateway firmware implementation for the STM32F407 platform, br
 * **On-Chip Flash**: 1024 KB @ `0x08000000`
 * **On-Chip SRAM**: 192 KB total (128 KB continuous SRAM1/2 @ `0x20000000` + 64 KB CCM @ `0x10000000`)
 * **Ethernet Controller**: Microchip ENC28J60 (Standalone 10Base-T Ethernet controller with 8 KB dual-port SRAM)
-* **Sensor Bus**: I2C1 (BME280 / MPU6050 environmental/motion telemetry)
+* **Sensor Bus**: I2C1 (BME280 / BMP280 environmental telemetry)
 
 ---
 
@@ -67,47 +87,19 @@ eco-connect-gateway/
 
 ---
 
-## 4. Reproducible Build Instructions
+## 4. Step-by-Step Quickstart Guide
 
-### Toolchain Prerequisites
-* **ARM GCC Toolchain**: `arm-none-eabi-gcc` (Version 12.x or 14.x)
-* **Build System**: GNU Make (`mingw32-make` or `make`)
-* **Flash Programmer**: OpenOCD (with ST-Link v2 / v2-1 configuration)
-* **RTOS Environment**: Zephyr West meta-tool (`west` version 1.2+)
+This repository functions as a **self-bootstrapping West manifest repository (`west.yml`)**. Anyone can clone, build, flash, and verify the gateway in four sequential steps.
 
----
+### Step 1: Hardware Connections
+1. Wire the **BME280** to MCU pins `PB6` (SCL) and `PB7` (SDA) with 4.7k pull-up resistors to 3.3V.
+2. Wire the **ENC28J60** SPI bus to MCU pins `PA5` (SCK), `PA6` (MISO), `PA7` (MOSI), and `PB12` (CS).
+3. Connect an Ethernet cable from the ENC28J60 module into your local router or network switch.
+4. Connect the STM32F4-Discovery board to your PC via Mini-USB (ST-LINK port).
 
-### Target 1: Building & Flashing Bare-Metal Bring-Up
+### Step 2: Build & Flash Firmware
+Open your terminal and run:
 
-The bare-metal target provides zero-dependency register verification of the MCU, vector table, clock gating, and linker script layout.
-
-```bash
-# Navigate to the baremetal workspace
-cd baremetal
-
-# Build with GNU Make
-make all
-
-# Output footprint:
-# text: ~380 bytes, data: 0 bytes, bss: 0 bytes
-
-# Flash to silicon via OpenOCD
-make flash
-```
-
-Alternatively on Windows PowerShell:
-```powershell
-.\build.bat
-.\flash.bat
-```
-
----
-
-### Target 2: Building & Flashing Zephyr RTOS Application
-
-This repository functions as a self-bootstrapping West manifest repository (`west.yml`). Anyone can clone and build the complete stack in two commands:
-
-#### Option A: Quickstart from Scratch (Self-Bootstrapping Manifest)
 ```bash
 # 1. Initialize a new workspace using this repository's West manifest
 west init -m https://github.com/rohith-bn/eco-connect-gateway.git eco_workspace
@@ -116,22 +108,50 @@ cd eco_workspace
 # 2. Pull all matching Zephyr dependencies (kernel, STM32 HAL, CMSIS)
 west update
 
-# 3. Build for STM32F4-Discovery
+# 3. Build the Zephyr application for STM32F4-Discovery
 west build -b stm32f4_disco eco-connect-gateway/zephyr_app
 
-# 4. Flash to silicon via OpenOCD / ST-LINK
+# 4. Flash to target silicon via OpenOCD / ST-LINK
 west flash
 ```
 
-#### Option B: Building Inside an Existing Zephyr Workspace
-If you already have a Zephyr development workspace:
-```bash
-# Clone directly into your application directory
-git clone https://github.com/rohith-bn/eco-connect-gateway.git
+*(Note: For standalone bare-metal bringup without RTOS, see [`baremetal/`](baremetal/) where running `make all && make flash` flashes the direct register target).*
 
-# Build and flash
-west build -b stm32f4_disco eco-connect-gateway/zephyr_app
-west flash
+### Step 3: Monitor Live Boot Telemetry
+Connect any serial terminal (e.g., VS Code Serial Monitor, PuTTY, or Minicom) to your ST-LINK virtual COM port:
+* **Baud Rate**: `115200`
+* **Data Bits**: `8`
+* **Parity**: `None`
+* **Stop Bits**: `1`
+
+You will observe structured, per-module boot diagnostics:
+```text
+*** Booting Zephyr OS build v4.5.0-1994-g0c63b6bfeb0d ***
+[00:00:00.010] <inf> app_main: === EcoConnect Gateway Booting (STM32F407G-DISC1) ===
+[00:00:00.052] <inf> bme280_sensor: BMP/BME280 init @0x76 (ID:0x60, imm:0x27, stat:0x00)
+[00:00:00.053] <dbg> bme280_sensor: Trims: T1=27845, T2=26481, T3=-1000
+[00:00:00.060] <inf> eth_enc28j60: MAC 00:04:a3:11:22:33 initialized
+[00:00:01.420] <inf> app_main: ENC28J60 Link UP at boot
+[00:00:02.150] <inf> net_dhcpv4: Received IPv4 address: 192.168.1.145
+[00:00:02.155] <inf> app_main: IPv4 address acquired: 192.168.1.145
+[00:00:02.160] <inf> http_srv: HTTP Server thread started on TCP port 80
+[00:00:04.050] <inf> bme280_sensor: Temperature: 24.35 C (raw_adc=0x0825F0)
+```
+
+### Step 4: Access the Live Web Server
+Open any web browser on your local network (laptop or phone) and navigate to:
+```text
+http://192.168.1.145/
+```
+The embedded gateway responds with live JSON telemetry:
+```json
+{
+  "device": "EcoConnect-STM32F407",
+  "status": "HEALTHY",
+  "temperature_c": 24.35,
+  "chip_id": "0x60",
+  "uptime_sec": 42
+}
 ```
 
 ---
@@ -146,10 +166,36 @@ west flash
    * Adherence to Microchip silicon errata #5 by fixing `ERXST` at `0x0000` to prevent pointer wrap memory corruption.
 3. **Flow Control Architecture**:
    * Bridges the speed mismatch between the 10 Mbps wire rate and the 10.5 MHz half-duplex SPI host bus using Layer 4 TCP sliding receive window (`rcv_wnd`) throttling to prevent internal SRAM overrun.
+4. **POSIX System Error Conventions**:
+   * Sensor and network drivers strictly return standard POSIX negative errno values (`-EINVAL`, `-ENODEV`, `-EIO`), enabling caller state machines to execute autonomous recovery routines.
 
 ---
 
-## 6. License & Authorship
+## 6. Project Roadmap & Implementation Milestones
+
+```text
+ [Phase 1: Bare Metal Bringup] ──► [Phase 2: RTOS & Networking] ──► [Phase 3: Cloud & Security]
+           COMPLETED                            COMPLETED                         PLANNED
+```
+
+### Completed Milestones
+* [x] **Milestone 1 (Stage 1 Bring-Up)**: Bare-metal Cortex-M4 startup file (`startup.c`), linker script (`linker.ld`), and register-level MMIO GPIO blinky with custom Makefile.
+* [x] **Milestone 2 (Devicetree & Pinout)**: Zephyr RTOS overlay (`app.overlay`) mapping I2C1 (PB6/PB7) and SPI1 (PA5/PA6/PA7 + PB12 CS).
+* [x] **Milestone 3 (I2C Sensor Driver)**: Bosch BME280/BMP280 auto-detect driver with 32-bit fixed-point integer polynomial compensation.
+* [x] **Milestone 4 (Ethernet Subsystem)**: ENC28J60 driver integration over SPI with asynchronous link status callbacks.
+* [x] **Milestone 5 (TCP/IP & DHCPv4)**: Native Zephyr IP stack integration with dynamic IP acquisition.
+* [x] **Milestone 6 (Embedded HTTP Server)**: Multithreaded BSD Sockets HTTP server serving JSON telemetry.
+* [x] **Milestone 7 (West Manifest & CI Ready)**: Automated multi-repository dependency management via `west.yml`.
+
+### Future Scope & Planned Next Steps
+* [ ] **MQTT-SN / MQTT Telemetry Client**: Publish sensor telemetry to AWS IoT Core or local Mosquitto broker via lightweight publish-subscribe.
+* [ ] **TLS 1.3 / HTTPS Encryption**: Integrate mbedTLS socket credentials for authenticated cloud ingestion.
+* [ ] **LittleFS Local Flash Logging**: Persistent ring buffer logging of sensor readings during network disconnections.
+* [ ] **Low-Power Tickless Idle**: Enable STM32 Stop mode during sleep intervals, waking via EXTI line interrupts.
+
+---
+
+## 7. License & Authorship
 
 Authored by **Rohith B Narasimhamurthy** as part of the System Design Masterclass.  
 Licensed under the Apache-2.0 License.
